@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CA Office Pro — Chain System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0d14; font-family: 'Consolas','Courier New',monospace; color: #e8eaf0; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #0d1525; }
+  ::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 3px; }
+  input[type=date]::-webkit-calendar-picker-indicator { filter: invert(1); }
+  input, select, button { font-family: inherit; }
+  @keyframes shake {
+    0%,100%{transform:translateX(0)}
+    20%,60%{transform:translateX(-8px)}
+    40%,80%{transform:translateX(8px)}
+  }
+  @keyframes fadeIn {
+    from{opacity:0;transform:translateY(8px)}
+    to{opacity:1;transform:translateY(0)}
+  }
+  @keyframes slideIn {
+    from{opacity:0;transform:scale(0.96)}
+    to{opacity:1;transform:scale(1)}
+  }
+  .fade-in { animation: fadeIn 0.3s ease; }
+  .card {
+    background: #0d1525;
+    border: 1px solid #1e3a5f;
+    border-radius: 14px;
+    padding: 18px;
+  }
+  .card:hover { border-color: #2563eb; }
+  .btn-primary {
+    background: linear-gradient(135deg,#2563eb,#7c3aed);
+    border: none; border-radius: 8px; color: #fff;
+    padding: 10px 20px; cursor: pointer; font-size: 13px;
+    font-weight: 700; font-family: inherit; width: 100%;
+  }
+  .btn-primary:hover { opacity: 0.9; }
+  .inp {
+    width: 100%; background: #111827; border: 1px solid #1e3a5f;
+    border-radius: 8px; color: #e8eaf0; padding: 9px 12px;
+    font-size: 13px; outline: none; margin-bottom: 10px;
+    font-family: inherit;
+  }
+  .inp:focus { border-color: #2563eb; }
+  .lbl { font-size: 11px; color: #4a90d9; margin-bottom: 4px; display: block; letter-spacing: 1px; }
+  @media(max-width:600px){
+    .biz-grid { grid-template-columns: 1fr !important; }
+    .stat-grid { grid-template-columns: 1fr 1fr !important; }
+    .emp-row { flex-direction: column !important; }
+    .nav-lbl { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+
+// ─── STORAGE ────────────────────────────────────────────────
+const STORAGE_KEY = "ca_chain_pro_v2";
+const DEFAULT_PIN = "1234";
+
+const DEFAULT_DATA = {
+  ca: {
+    name: "CA Sharma & Associates",
+    gstin: "27AABCS1234A1Z5",
+    tools: ["GST Filing","ITR","Audit","TDS","ROC"]
+  },
+  businesses: [
+    { id:"biz-001", name:"Mehta Traders Pvt Ltd", type:"Manufacturing",
+      gstin:"27AABCM5678B1Z3", phone:"9876543210", email:"mehta@example.com",
+      annualTurnover:2400000, gstStatus:"Filed", itrStatus:"Pending",
+      tdsStatus:"Done", lastContact:"2026-04-18" },
+    { id:"biz-002", name:"Kapoor Retail Chain", type:"Retail",
+      gstin:"27AABCK9012C1Z1", phone:"9123456780", email:"kapoor@example.com",
+      annualTurnover:5800000, gstStatus:"Pending", itrStatus:"Filed",
+      tdsStatus:"Pending", lastContact:"2026-04-15" },
+    { id:"biz-003", name:"Singh IT Solutions", type:"Services",
+      gstin:"27AABCS3456D1Z9", phone:"9988776655", email:"singh@example.com",
+      annualTurnover:1200000, gstStatus:"Filed", itrStatus:"Filed",
+      tdsStatus:"Done", lastContact:"2026-04-20" },
+  ],
+  employees: [
+    { id:"emp-001", bizId:"biz-001", name:"Rajesh Kumar", role:"Manager",
+      pan:"ABCPK1234D", salary:55000, tds:3200, pf:6600, esi:1375, form16:"Done" },
+    { id:"emp-002", bizId:"biz-001", name:"Priya Singh", role:"Accountant",
+      pan:"DEFPS5678E", salary:38000, tds:1800, pf:4560, esi:950, form16:"Pending" },
+    { id:"emp-003", bizId:"biz-002", name:"Amit Shah", role:"Supervisor",
+      pan:"GHIAS9012F", salary:42000, tds:2100, pf:5040, esi:1050, form16:"Done" },
+    { id:"emp-004", bizId:"biz-003", name:"Neha Verma", role:"Developer",
+      pan:"IJKNV3456G", salary:68000, tds:5500, pf:8160, esi:0, form16:"Done" },
+  ],
+  accounts: [
+    { id:"acc-001", bizId:"biz-001", type:"GST Payable", amount:124500, due:"2026-04-25", status:"Due" },
+    { id:"acc-002", bizId:"biz-001", type:"TDS Deposit", amount:48200, due:"2026-04-07", status:"Overdue" },
+    { id:"acc-003", bizId:"biz-002", type:"Advance Tax", amount:210000, due:"2026-06-15", status:"Upcoming" },
+    { id:"acc-004", bizId:"biz-002", type:"GST Payable", amount:367800, due:"2026-04-25", status:"Due" },
+    { id:"acc-005", bizId:"biz-003", type:"TDS Deposit", amount:22500, due:"2026-05-07", status:"Upcoming" },
+  ],
+};
+
+function loadData() {
+  try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : DEFAULT_DATA; }
+  catch { return DEFAULT_DATA; }
+}
+function saveData(d) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch {} }
+function loadPin()  { try { return localStorage.getItem("ca_pin") || DEFAULT_PIN; } catch { return DEFAULT_PIN; } }
+function savePin(p) { try { localStorage.setItem("ca_pin", p); } catch {} }
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const fmt = (n) => "₹" + Number(n).toLocaleString("en-IN");
+const SC = (s) => ({Filed:"#00e5a0",Done:"#00e5a0",Pending:"#ffb347",Due:"#ffb347",Overdue:"#ff4d6d",Upcoming:"#4dc3ff",Paid:"#00e5a0"}[s]||"#aaa");
+const health = (b) => (b.gstStatus==="Filed"?34:0)+(b.itrStatus==="Filed"?33:0)+(b.tdsStatus==="Done"?33:0);
+const HC = (h) => h>=90?"#00e5a0":h>=60?"#ffb347":"#ff4d6d";
+
+// ─── TOAST ──────────────────────────────────────────────────
+function Toast({ msg, onDone }) {
+  useEffect(() => { const t = setTimeout(onDone, 2800); return () => clearTimeout(t); }, []);
+  return (
+    <div style={{
+      position:"fixed",bottom:24,right:24,zIndex:9999,
+      background:"#0f2040",border:"1px solid #2563eb",borderRadius:12,
+      padding:"12px 22px",color:"#60a5fa",fontSize:13,fontWeight:700,
+      boxShadow:"0 8px 32px #00000099",animation:"slideIn 0.2s ease",
+    }}>{msg}</div>
+  );
+}
+
+// ─── MODAL ──────────────────────────────────────────────────
+function Modal({ title, onClose, children }) {
+  return (
+    <div style={{
+      position:"fixed",inset:0,zIndex:1000,background:"#000000cc",
+      display:"flex",alignItems:"center",justifyContent:"center",padding:16,
+    }} onClick={e => e.target===e.currentTarget && onClose()}>
+      <div style={{
+        background:"#0d1525",border:"1px solid #2563eb",borderRadius:18,
+        padding:26,width:"100%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",
+        animation:"slideIn 0.2s ease",
+      }}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <div style={{fontSize:15,fontWeight:800,color:"#fff"}}>{title}</div>
+          <button onClick={onClose} style={{background:"transparent",border:"none",color:"#6b7280",fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─── PIN SCREEN ─────────────────────────────────────────────
+function PinScreen({ onUnlock }) {
+  const [pin, setPin] = useState("");
+  const [err, setErr] = useState(false);
+  const [shake, setShake] = useState(false);
+
+  const tryPin = (p) => {
+    if (p === loadPin()) { onUnlock(); }
+    else {
+      setErr(true); setShake(true); setPin("");
+      setTimeout(() => setShake(false), 500);
+    }
+  };
+  const press = (d) => {
+    if (d === "DEL") { setPin(p => p.slice(0,-1)); setErr(false); return; }
+    const next = pin + d;
+    setPin(next); setErr(false);
+    if (next.length === 4) setTimeout(() => tryPin(next), 120);
+  };
+
+  return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0a0d14"}}>
+      <div style={{textAlign:"center",maxWidth:300,width:"100%",padding:24}}>
+        <div style={{fontSize:48,marginBottom:12}}>⚖️</div>
+        <div style={{fontSize:20,fontWeight:900,color:"#fff",letterSpacing:3,marginBottom:4}}>CA OFFICE PRO</div>
+        <div style={{fontSize:11,color:"#4a90d9",letterSpacing:4,marginBottom:36}}>PIN डालें</div>
+
+        <div style={{
+          display:"flex",justifyContent:"center",gap:16,marginBottom:32,
+          animation: shake ? "shake 0.4s ease" : "none",
+        }}>
+          {[0,1,2,3].map(i => (
+            <div key={i} style={{
+              width:18,height:18,borderRadius:"50%",
+              background: i<pin.length ? (err?"#ff4d6d":"#2563eb") : "#1e3a5f",
+              transition:"background 0.2s",
+            }}/>
+          ))}
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+          {["1","2","3","4","5","6","7","8","9","","0","DEL"].map((d,i) => (
+            <button key={i} onClick={() => d && press(d)} style={{
+              background: d==="DEL"?"#1a1030":d===""?"transparent":"#0f1f3d",
+              border: d&&d!==""?"1px solid #1e3a5f":"none",
+              borderRadius:14,padding:"20px 0",
+              fontSize:d==="DEL"?16:22,fontWeight:700,
+              color:d==="DEL"?"#ff4d6d":"#e8eaf0",
+              cursor:d?"pointer":"default",fontFamily:"inherit",
+              transition:"all 0.15s",
+            }}
+              onMouseEnter={e=>d&&d!==""&&(e.target.style.background="#1e3a5f")}
+              onMouseLeave={e=>d&&d!==""&&(e.target.style.background=d==="DEL"?"#1a1030":"#0f1f3d")}
+            >{d}</button>
+          ))}
+        </div>
+
+        {err && <div style={{color:"#ff4d6d",fontSize:12,marginTop:16,fontWeight:600}}>❌ गलत PIN — Default: 1234</div>}
+        <div style={{color:"#1e3a5f",fontSize:11,marginTop:20}}>CA Office Pro v2.0</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN APP ───────────────────────────────────────────────
+function App() {
+  const [unlocked, setUnlocked] = useState(false);
+  const [data, setData]         = useState(loadData);
+  const [view, setView]         = useState("chain");
+  const [selBiz, setSelBiz]     = useState(null);
+  const [bizTab, setBizTab]     = useState("employees");
+  const [search, setSearch]     = useState("");
+  const [fGST, setFGST]         = useState("All");
+  const [toast, setToast]       = useState(null);
+  const [modal, setModal]       = useState(null);
+  const [pinModal, setPinModal] = useState(false);
+  const [newPin, setNewPin]     = useState("");
+
+  useEffect(() => { if (unlocked) saveData(data); }, [data, unlocked]);
+
+  const T = (msg) => setToast(msg);
+  const CM = () => setModal(null);
+
+  if (!unlocked) return <PinScreen onUnlock={() => setUnlocked(true)} />;
+
+  // CRUD
+  const addBiz = (f) => {
+    setData(d => ({...d, businesses:[...d.businesses,{...f,id:"biz-"+uid(),annualTurnover:+f.annualTurnover||0,gstStatus:"Pending",itrStatus:"Pending",tdsStatus:"Pending",lastContact:new Date().toISOString().slice(0,10)}]}));
+    T("✅ Business जोड़ा गया!"); CM();
+  };
+  const editBiz = (f) => {
+    setData(d => ({...d, businesses:d.businesses.map(b=>b.id===f.id?{...b,...f,annualTurnover:+f.annualTurnover}:b)}));
+    T("✅ Business update हुआ!"); CM();
+  };
+  const delBiz = (id) => {
+    if (!window.confirm("क्या आप इस business को delete करना चाहते हैं?")) return;
+    setData(d => ({...d,businesses:d.businesses.filter(b=>b.id!==id),employees:d.employees.filter(e=>e.bizId!==id),accounts:d.accounts.filter(a=>a.bizId!==id)}));
+    setSelBiz(null); T("🗑️ Business delete हुआ");
+  };
+  const addEmp = (f) => {
+    setData(d => ({...d,employees:[...d.employees,{...f,id:"emp-"+uid(),bizId:selBiz,salary:+f.salary,tds:+f.tds,pf:+f.pf,esi:+f.esi||0}]}));
+    T("✅ Employee जोड़ा गया!"); CM();
+  };
+  const delEmp = (id) => { setData(d => ({...d,employees:d.employees.filter(e=>e.id!==id)})); T("🗑️ Employee हटाया"); };
+  const addAcc = (f) => {
+    setData(d => ({...d,accounts:[...d.accounts,{...f,id:"acc-"+uid(),bizId:selBiz,amount:+f.amount}]}));
+    T("✅ Entry जोड़ी गई!"); CM();
+  };
+  const delAcc = (id) => { setData(d => ({...d,accounts:d.accounts.filter(a=>a.id!==id)})); T("🗑️ Entry हटाई"); };
+  const updComp = (id,field,val) => {
+    setData(d => ({...d,businesses:d.businesses.map(b=>b.id===id?{...b,[field]:val}:b)}));
+    T("✅ Status update हुआ!");
+  };
+
+  const biz       = selBiz ? data.businesses.find(b=>b.id===selBiz) : null;
+  const bizEmps   = selBiz ? data.employees.filter(e=>e.bizId===selBiz) : [];
+  const bizAccs   = selBiz ? data.accounts.filter(a=>a.bizId===selBiz) : [];
+  const filtered  = data.businesses.filter(b =>
+    (b.name.toLowerCase().includes(search.toLowerCase()) || b.gstin.toLowerCase().includes(search.toLowerCase()) || b.type.toLowerCase().includes(search.toLowerCase())) &&
+    (fGST==="All" || b.gstStatus===fGST)
+  );
+
+  const alerts = [
+    ...data.accounts.filter(a=>a.status==="Overdue").map(a=>({level:"danger",icon:"🔴",title:`OVERDUE: ${a.type}`,desc:`${data.businesses.find(b=>b.id===a.bizId)?.name} — ${fmt(a.amount)} — Due: ${a.due}`})),
+    ...data.accounts.filter(a=>a.status==="Due").map(a=>({level:"warn",icon:"🟡",title:`DUE SOON: ${a.type}`,desc:`${data.businesses.find(b=>b.id===a.bizId)?.name} — ${fmt(a.amount)} — ${a.due}`})),
+    ...data.businesses.filter(b=>b.gstStatus==="Pending").map(b=>({level:"warn",icon:"⚠️",title:`GST File नहीं हुई: ${b.name}`,desc:"GSTR-3B current month के लिए pending है"})),
+    ...data.employees.filter(e=>e.form16==="Pending").map(e=>({level:"info",icon:"📋",title:`Form 16 Pending: ${e.name}`,desc:data.businesses.find(b=>b.id===e.bizId)?.name||""})),
+  ];
+
+  // Forms
+  function BizForm({ init, onSave }) {
+    const [f, setF] = useState(init || {name:"",type:"",gstin:"",phone:"",email:"",annualTurnover:""});
+    const fields = [["व्यापार का नाम","name"],["प्रकार (Retail/Manufacturing/Services)","type"],["GSTIN","gstin"],["Phone","phone"],["Email","email"],["Annual Turnover (₹)","annualTurnover"]];
+    return (
+      <div>
+        {fields.map(([lbl,key]) => (
+          <div key={key}><label className="lbl">{lbl}</label>
+          <input className="inp" value={f[key]||""} onChange={e=>setF({...f,[key]:e.target.value})} /></div>
+        ))}
+        <button className="btn-primary" onClick={()=>onSave(f)}>💾 Save करें</button>
+      </div>
+    );
+  }
+  function EmpForm() {
+    const [f,setF]=useState({name:"",role:"",pan:"",salary:"",tds:"",pf:"",esi:"",form16:"Pending"});
+    return (
+      <div>
+        {[["नाम","name"],["पद (Role)","role"],["PAN","pan"],["Salary (₹)","salary"],["TDS (₹)","tds"],["PF (₹)","pf"],["ESI (₹)","esi"]].map(([l,k])=>(
+          <div key={k}><label className="lbl">{l}</label><input className="inp" value={f[k]} onChange={e=>setF({...f,[k]:e.target.value})} /></div>
+        ))}
+        <label className="lbl">Form 16</label>
+        <select className="inp" value={f.form16} onChange={e=>setF({...f,form16:e.target.value})}>
+          <option>Pending</option><option>Done</option>
+        </select>
+        <button className="btn-primary" onClick={()=>addEmp(f)}>💾 Employee जोड़ें</button>
+      </div>
+    );
+  }
+  function AccForm() {
+    const [f,setF]=useState({type:"GST Payable",amount:"",due:"",status:"Due"});
+    return (
+      <div>
+        <label className="lbl">प्रकार</label>
+        <select className="inp" value={f.type} onChange={e=>setF({...f,type:e.target.value})}>
+          {["GST Payable","TDS Deposit","Advance Tax","Professional Tax","Income Tax","Other"].map(t=><option key={t}>{t}</option>)}
+        </select>
+        <label className="lbl">Amount (₹)</label>
+        <input className="inp" type="number" value={f.amount} onChange={e=>setF({...f,amount:e.target.value})} />
+        <label className="lbl">Due Date</label>
+        <input className="inp" type="date" value={f.due} onChange={e=>setF({...f,due:e.target.value})} style={{colorScheme:"dark"}}/>
+        <label className="lbl">Status</label>
+        <select className="inp" value={f.status} onChange={e=>setF({...f,status:e.target.value})}>
+          {["Due","Upcoming","Overdue","Paid"].map(s=><option key={s}>{s}</option>)}
+        </select>
+        <button className="btn-primary" onClick={()=>addAcc(f)}>💾 Entry जोड़ें</button>
+      </div>
+    );
+  }
+
+  const totalTurnover = data.businesses.reduce((s,b)=>s+(b.annualTurnover||0),0);
+
+  return (
+    <div style={{minHeight:"100vh",background:"#0a0d14"}}>
+      {/* HEADER */}
+      <div style={{background:"#0d1525",borderBottom:"1px solid #1e3a5f",padding:"13px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,position:"sticky",top:0,zIndex:100}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:36,height:36,borderRadius:10,background:"linear-gradient(135deg,#2563eb,#7c3aed)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>⚖️</div>
+          <div>
+            <div style={{fontSize:13,fontWeight:900,color:"#fff",letterSpacing:1}}>CA OFFICE PRO</div>
+            <div style={{fontSize:9,color:"#4a90d9",letterSpacing:2}}>CHAIN SYSTEM</div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {[
+            {k:"chain",l:"🔗 Chain"},
+            {k:"alerts",l:`🔔 Alerts${alerts.length?` (${alerts.length})`:""}`,red:alerts.filter(a=>a.level==="danger").length>0},
+            {k:"tools",l:"🛠 Tools"},
+          ].map(v=>(
+            <button key={v.k} onClick={()=>{setView(v.k);setSelBiz(null);}} style={{
+              padding:"7px 13px",borderRadius:8,border:"1px solid",
+              borderColor:view===v.k?"#2563eb":v.red?"#ff4d6d44":"#1e3a5f",
+              background:view===v.k?"#2563eb22":v.red?"#ff4d6d11":"transparent",
+              color:view===v.k?"#60a5fa":v.red?"#ff4d6d":"#6b7280",
+              cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit",
+            }}>{v.l}</button>
+          ))}
+          <button onClick={()=>setPinModal(true)} style={{padding:"7px 11px",borderRadius:8,border:"1px solid #1e3a5f",background:"transparent",color:"#6b7280",cursor:"pointer",fontSize:13}} title="PIN बदलें">🔒</button>
+          <button onClick={()=>{if(window.confirm("Demo data reset करें?")){ saveData(DEFAULT_DATA); setData(DEFAULT_DATA); setSelBiz(null); T("🔄 Reset हुआ");}}} style={{padding:"7px 11px",borderRadius:8,border:"1px solid #1e3a5f",background:"transparent",color:"#6b7280",cursor:"pointer",fontSize:13}} title="Reset">↺</button>
+        </div>
+      </div>
+
+      <div style={{padding:"18px 18px 60px"}} className="fade-in">
+
+        {/* ═══ CHAIN VIEW ═══ */}
+        {view==="chain" && !selBiz && (
+          <div>
+            {/* CA Banner */}
+            <div className="card" style={{border:"2px solid #2563eb",marginBottom:18,display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:14,alignItems:"center"}}>
+              <div style={{display:"flex",alignItems:"center",gap:14}}>
+                <div style={{fontSize:36}}>⚖️</div>
+                <div>
+                  <div style={{fontSize:17,fontWeight:900,color:"#fff"}}>{data.ca.name}</div>
+                  <div style={{fontSize:11,color:"#4a90d9",marginTop:2}}>GSTIN: {data.ca.gstin}</div>
+                  <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
+                    {data.ca.tools.map(t=><span key={t} style={{background:"#1e3a5f",borderRadius:6,padding:"2px 10px",fontSize:10,color:"#60a5fa"}}>{t}</span>)}
+                  </div>
+                </div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:11,color:"#6b7280"}}>कुल Turnover</div>
+                <div style={{fontSize:24,fontWeight:900,color:"#00e5a0"}}>{fmt(totalTurnover)}</div>
+                <div style={{fontSize:11,color:alerts.filter(a=>a.level==="danger").length?"#ff4d6d":"#6b7280",marginTop:4}}>
+                  {alerts.length>0 ? `⚠ ${alerts.length} Alerts हैं` : "✅ सब ठीक है"}
+                </div>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:18}}>
+              {[
+                {l:"Businesses",v:data.businesses.length,i:"🏢",c:"#60a5fa"},
+                {l:"Employees",v:data.employees.length,i:"👥",c:"#a78bfa"},
+                {l:"GST Pending",v:data.businesses.filter(b=>b.gstStatus==="Pending").length,i:"📋",c:"#ffb347"},
+                {l:"Overdue",v:data.accounts.filter(a=>a.status==="Overdue").length,i:"🔴",c:"#ff4d6d"},
+              ].map(s=>(
+                <div key={s.l} className="card" style={{display:"flex",alignItems:"center",gap:10,padding:14}}>
+                  <span style={{fontSize:20}}>{s.i}</span>
+                  <div><div style={{fontSize:22,fontWeight:900,color:s.c}}>{s.v}</div><div style={{fontSize:10,color:"#6b7280"}}>{s.l}</div></div>
+                </div>
+              ))}
+            </div>
+
+            {/* Search + Filter */}
+            <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+              <input className="inp" style={{flex:1,minWidth:180,marginBottom:0}} placeholder="🔍 Business name / GSTIN / type खोजें..." value={search} onChange={e=>setSearch(e.target.value)} />
+              {["All","Filed","Pending"].map(f=>(
+                <button key={f} onClick={()=>setFGST(f)} style={{
+                  padding:"9px 14px",borderRadius:8,border:"1px solid",fontFamily:"inherit",
+                  borderColor:fGST===f?"#2563eb":"#1e3a5f",
+                  background:fGST===f?"#2563eb22":"transparent",
+                  color:fGST===f?"#60a5fa":"#6b7280",cursor:"pointer",fontSize:11,fontWeight:700,
+                }}>GST: {f}</button>
+              ))}
+              <button onClick={()=>setModal({type:"addBiz"})} style={{padding:"9px 16px",borderRadius:8,background:"linear-gradient(135deg,#2563eb,#7c3aed)",border:"none",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>+ Business जोड़ें</button>
+            </div>
+
+            {/* Biz Cards */}
+            <div className="biz-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(290px,1fr))",gap:12}}>
+              {filtered.map(b => {
+                const h = health(b);
+                return (
+                  <div key={b.id} className="card" style={{cursor:"pointer",position:"relative",overflow:"hidden",transition:"transform 0.2s"}}
+                    onClick={()=>{setSelBiz(b.id);setBizTab("employees");}}
+                    onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"}
+                    onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}
+                  >
+                    <div style={{position:"absolute",top:0,right:0,width:64,height:64,borderRadius:"0 14px 0 64px",background:`${HC(h)}18`}}/>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                      <div style={{flex:1,paddingRight:10}}>
+                        <div style={{fontSize:14,fontWeight:800,color:"#fff"}}>{b.name}</div>
+                        <div style={{fontSize:10,color:"#4a90d9",marginTop:2}}>{b.type}</div>
+                        <div style={{fontSize:10,color:"#6b7280"}}>{b.gstin}</div>
+                      </div>
+                      <div style={{fontSize:20,fontWeight:900,color:HC(h),whiteSpace:"nowrap"}}>{h}%</div>
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginTop:12}}>
+                      {[["GST",b.gstStatus],["ITR",b.itrStatus],["TDS",b.tdsStatus]].map(([l,v])=>(
+                        <div key={l} style={{background:"#111827",borderRadius:7,padding:"6px 3px",textAlign:"center",border:`1px solid ${SC(v)}30`}}>
+                          <div style={{fontSize:9,color:"#6b7280"}}>{l}</div>
+                          <div style={{fontSize:11,fontWeight:700,color:SC(v)}}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{display:"flex",justifyContent:"space-between",marginTop:10,paddingTop:8,borderTop:"1px solid #1e3a5f"}}>
+                      <div style={{fontSize:11,color:"#4a90d9"}}>Turnover: <span style={{color:"#fff"}}>{fmt(b.annualTurnover)}</span></div>
+                      <div style={{fontSize:10,color:"#6b7280"}}>{b.lastContact}</div>
+                    </div>
+                  </div>
+                );
+              })}
+              {filtered.length===0 && <div style={{color:"#6b7280",fontSize:13,padding:20}}>कोई business नहीं मिला।</div>}
+            </div>
+          </div>
+        )}
+
+        {/* ═══ BIZ DETAIL ═══ */}
+        {view==="chain" && selBiz && biz && (
+          <div className="fade-in">
+            <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+              <button onClick={()=>setSelBiz(null)} style={{background:"transparent",border:"1px solid #1e3a5f",color:"#4a90d9",borderRadius:8,padding:"7px 14px",cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>← वापस</button>
+              <button onClick={()=>setModal({type:"editBiz",payload:biz})} style={{background:"transparent",border:"1px solid #2563eb44",color:"#60a5fa",borderRadius:8,padding:"7px 14px",cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>✏️ Edit</button>
+              <button onClick={()=>delBiz(biz.id)} style={{background:"#7f1d1d22",border:"1px solid #ff4d6d44",borderRadius:8,color:"#ff4d6d",padding:"7px 14px",cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>🗑️ Delete</button>
+            </div>
+
+            <div className="card" style={{border:"1px solid #2563eb",marginBottom:16,display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:12,alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:17,fontWeight:900,color:"#fff"}}>{biz.name}</div>
+                <div style={{fontSize:11,color:"#4a90d9"}}>{biz.type} · {biz.gstin}</div>
+                <div style={{fontSize:11,color:"#6b7280",marginTop:2}}>📞 {biz.phone} &nbsp;·&nbsp; 📧 {biz.email}</div>
+                <div style={{fontSize:11,color:"#6b7280"}}>Turnover: <span style={{color:"#00e5a0"}}>{fmt(biz.annualTurnover)}</span></div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:28,fontWeight:900,color:HC(health(biz))}}>{health(biz)}%</div>
+                <div style={{fontSize:10,color:"#6b7280"}}>Compliance Score</div>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div style={{display:"flex",gap:4,marginBottom:16,flexWrap:"wrap"}}>
+              {[["employees","👥 Employees"],["accounts","📊 Accounts"],["compliance","✅ Compliance"]].map(([k,l])=>(
+                <button key={k} onClick={()=>setBizTab(k)} style={{
+                  padding:"8px 16px",borderRadius:8,border:"1px solid",fontFamily:"inherit",
+                  borderColor:bizTab===k?"#2563eb":"#1e3a5f",
+                  background:bizTab===k?"#2563eb22":"transparent",
+                  color:bizTab===k?"#60a5fa":"#6b7280",cursor:"pointer",fontSize:12,fontWeight:700,
+                }}>{l}</button>
+              ))}
+            </div>
+
+            {bizTab==="employees" && (
+              <div>
+                <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
+                  <button onClick={()=>setModal({type:"addEmp"})} style={{padding:"8px 16px",borderRadius:8,background:"linear-gradient(135deg,#2563eb,#7c3aed)",border:"none",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>+ Employee जोड़ें</button>
+                </div>
+                {bizEmps.length===0 && <div style={{color:"#6b7280",fontSize:13}}>कोई employee नहीं। ऊपर से जोड़ें।</div>}
+                {bizEmps.map(e=>(
+                  <div key={e.id} className="card" style={{marginBottom:10,display:"flex",flexWrap:"wrap",justifyContent:"space-between",alignItems:"center",gap:12}}>
+                    <div style={{minWidth:140}}>
+                      <div style={{fontWeight:700,color:"#fff",fontSize:13}}>{e.name}</div>
+                      <div style={{fontSize:10,color:"#4a90d9"}}>{e.role} · {e.pan}</div>
+                    </div>
+                    <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
+                      {[["Salary",fmt(e.salary),"#fff"],["TDS",fmt(e.tds),"#ffb347"],["PF",fmt(e.pf),"#60a5fa"],["ESI",e.esi?fmt(e.esi):"—","#a78bfa"],["Form 16",e.form16,SC(e.form16)]].map(([l,v,c])=>(
+                        <div key={l} style={{textAlign:"center"}}>
+                          <div style={{fontSize:9,color:"#6b7280"}}>{l}</div>
+                          <div style={{fontSize:12,fontWeight:700,color:c}}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={()=>delEmp(e.id)} style={{background:"transparent",border:"none",color:"#ff4d6d55",cursor:"pointer",fontSize:18,padding:4,lineHeight:1,fontFamily:"inherit"}}
+                      onMouseEnter={e2=>e2.target.style.color="#ff4d6d"} onMouseLeave={e2=>e2.target.style.color="#ff4d6d55"}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {bizTab==="accounts" && (
+              <div>
+                <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
+                  <button onClick={()=>setModal({type:"addAcc"})} style={{padding:"8px 16px",borderRadius:8,background:"linear-gradient(135deg,#2563eb,#7c3aed)",border:"none",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>+ Entry जोड़ें</button>
+                </div>
+                {bizAccs.length===0 && <div style={{color:"#6b7280",fontSize:13}}>कोई account entry नहीं।</div>}
+                {bizAccs.map(a=>(
+                  <div key={a.id} className="card" style={{marginBottom:10,borderLeftWidth:3,borderLeftColor:SC(a.status),borderLeftStyle:"solid",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+                    <div>
+                      <div style={{fontWeight:700,color:"#fff"}}>{a.type}</div>
+                      <div style={{fontSize:11,color:"#6b7280"}}>Due: {a.due}</div>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:14}}>
+                      <div style={{textAlign:"right"}}>
+                        <div style={{fontSize:16,fontWeight:800,color:"#fff"}}>{fmt(a.amount)}</div>
+                        <div style={{fontSize:11,fontWeight:700,color:SC(a.status)}}>{a.status}</div>
+                      </div>
+                      <button onClick={()=>delAcc(a.id)} style={{background:"transparent",border:"none",color:"#ff4d6d55",cursor:"pointer",fontSize:18,padding:4,lineHeight:1,fontFamily:"inherit"}}
+                        onMouseEnter={e=>e.target.style.color="#ff4d6d"} onMouseLeave={e=>e.target.style.color="#ff4d6d55"}>✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {bizTab==="compliance" && (
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
+                {[
+                  {l:"GST Return",field:"gstStatus",opts:["Filed","Pending"],cur:biz.gstStatus},
+                  {l:"ITR Filing",field:"itrStatus",opts:["Filed","Pending"],cur:biz.itrStatus},
+                  {l:"TDS Status",field:"tdsStatus",opts:["Done","Pending"],cur:biz.tdsStatus},
+                ].map(item=>(
+                  <div key={item.l} className="card">
+                    <div style={{fontSize:11,color:"#6b7280",marginBottom:10}}>{item.l}</div>
+                    <div style={{display:"flex",gap:6}}>
+                      {item.opts.map(opt=>(
+                        <button key={opt} onClick={()=>updComp(biz.id,item.field,opt)} style={{
+                          flex:1,padding:"10px 0",borderRadius:8,border:"1px solid",fontFamily:"inherit",
+                          borderColor:item.cur===opt?SC(opt):"#1e3a5f",
+                          background:item.cur===opt?`${SC(opt)}22`:"transparent",
+                          color:item.cur===opt?SC(opt):"#6b7280",
+                          cursor:"pointer",fontSize:12,fontWeight:700,
+                        }}>{opt}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══ ALERTS VIEW ═══ */}
+        {view==="alerts" && (
+          <div className="fade-in">
+            <div style={{fontSize:12,color:"#4a90d9",letterSpacing:3,marginBottom:18}}>◆ ALERTS & NOTIFICATIONS</div>
+            {alerts.length===0 && (
+              <div className="card" style={{color:"#00e5a0",textAlign:"center",padding:48,fontSize:14}}>
+                ✅ सब ठीक है! कोई alert नहीं।
+              </div>
+            )}
+            {alerts.map((a,i)=>(
+              <div key={i} className="card" style={{marginBottom:10,borderLeftWidth:3,borderLeftStyle:"solid",borderLeftColor:a.level==="danger"?"#ff4d6d":a.level==="warn"?"#ffb347":"#4dc3ff",display:"flex",alignItems:"center",gap:14}}>
+                <span style={{fontSize:22}}>{a.icon}</span>
+                <div>
+                  <div style={{fontWeight:700,color:"#fff",fontSize:13}}>{a.title}</div>
+                  <div style={{fontSize:11,color:"#6b7280",marginTop:2}}>{a.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ═══ TOOLS VIEW ═══ */}
+        {view==="tools" && (
+          <div className="fade-in">
+            <div style={{fontSize:12,color:"#4a90d9",letterSpacing:3,marginBottom:18}}>◆ CA AUTOMATION MODULES</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:12}}>
+              {[
+                {i:"📋",l:"GST Filing",d:"GSTR-1, 3B, Annual",c:"#2563eb",t:"Active ✓"},
+                {i:"📊",l:"TDS Manager",d:"26Q, 24Q, Form 16",c:"#7c3aed",t:"Active ✓"},
+                {i:"💰",l:"Payroll",d:"PF, ESI, Salary Slip",c:"#dc2626",t:"Active ✓"},
+                {i:"🔔",l:"Due Date Alert",d:"Deadline reminder",c:"#7c3aed",t:"Active ✓"},
+                {i:"🧾",l:"ITR Filing",d:"ITR-1 to ITR-6",c:"#059669",t:"जल्द"},
+                {i:"📁",l:"ROC Compliance",d:"MCA Filing, AOC-4",c:"#d97706",t:"जल्द"},
+                {i:"📈",l:"Tally Sync",d:"Auto import ledger",c:"#0891b2",t:"जल्द"},
+                {i:"👥",l:"Client Portal",d:"Document sharing",c:"#2563eb",t:"जल्द"},
+                {i:"🤖",l:"AI Assistant",d:"Tax query resolver",c:"#059669",t:"जल्द"},
+                {i:"📱",l:"WhatsApp Alert",d:"Auto client notify",c:"#25d366",t:"जल्द"},
+                {i:"📑",l:"Audit Tools",d:"Bank reconciliation",c:"#d97706",t:"जल्द"},
+                {i:"☁️",l:"Cloud Backup",d:"Secure doc storage",c:"#0891b2",t:"जल्द"},
+              ].map(tool=>(
+                <div key={tool.l} className="card" style={{cursor:"pointer",position:"relative",transition:"transform 0.18s"}}
+                  onClick={()=>T(tool.t.includes("Active")?`${tool.l} — module खुल रहा है...`:`${tool.l} — जल्द आएगा!`)}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=tool.c;e.currentTarget.style.transform="translateY(-2px)";}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor="#1e3a5f";e.currentTarget.style.transform="translateY(0)";}}
+                >
+                  <div style={{position:"absolute",top:10,right:10,background:`${tool.c}22`,borderRadius:6,padding:"2px 8px",fontSize:9,color:tool.c,fontWeight:700}}>{tool.t}</div>
+                  <div style={{fontSize:26,marginBottom:10}}>{tool.i}</div>
+                  <div style={{fontWeight:700,color:"#fff",fontSize:13}}>{tool.l}</div>
+                  <div style={{fontSize:11,color:"#6b7280",marginTop:3}}>{tool.d}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ═══ MODALS ═══ */}
+      {modal?.type==="addBiz" && <Modal title="➕ Business जोड़ें" onClose={CM}><BizForm onSave={addBiz}/></Modal>}
+      {modal?.type==="editBiz" && <Modal title="✏️ Business Edit करें" onClose={CM}><BizForm init={modal.payload} onSave={(f)=>editBiz({...modal.payload,...f})}/></Modal>}
+      {modal?.type==="addEmp" && <Modal title="➕ Employee जोड़ें" onClose={CM}><EmpForm/></Modal>}
+      {modal?.type==="addAcc" && <Modal title="➕ Account Entry जोड़ें" onClose={CM}><AccForm/></Modal>}
+
+      {pinModal && (
+        <Modal title="🔒 PIN बदलें" onClose={()=>{setPinModal(false);setNewPin("");}}>
+          <div style={{fontSize:12,color:"#6b7280",marginBottom:12}}>नई 4 digit PIN डालें:</div>
+          <label className="lbl">नई PIN</label>
+          <input className="inp" type="password" maxLength={4} value={newPin} onChange={e=>setNewPin(e.target.value)} placeholder="4 अंक डालें" />
+          <button className="btn-primary" onClick={()=>{
+            if(/^\d{4}$/.test(newPin)){savePin(newPin);setNewPin("");setPinModal(false);T("🔒 PIN बदल गई!");}
+            else T("❌ सिर्फ 4 अंक डालें");
+          }}>💾 PIN Save करें</button>
+        </Modal>
+      )}
+
+      {toast && <Toast msg={toast} onDone={()=>setToast(null)}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
